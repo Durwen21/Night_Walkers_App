@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:vibration/vibration.dart';
 import 'package:night_walkers_app/services/flashlight_service.dart';
+import 'package:night_walkers_app/services/sound_service.dart';
 
 class PanicButton extends StatefulWidget {
   const PanicButton({super.key});
@@ -28,8 +29,8 @@ class _PanicButtonState extends State<PanicButton> {
 
     // Turn on flashlight when alarm starts
     await FlashlightService.turnOn();
+    SoundService.playAlarm(); // Start alarm sound
 
-    
     _snackBarController = ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text(
@@ -74,6 +75,7 @@ class _PanicButtonState extends State<PanicButton> {
 
     // Ensure flashlight is off when stopping
     FlashlightService.turnOff();
+    SoundService.stopAlarm(); // Stop alarm sound
 
     _snackBarController?.close();
     _snackBarController = null;
