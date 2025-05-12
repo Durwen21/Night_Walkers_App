@@ -119,10 +119,16 @@ class _PanicButtonState extends State<PanicButton> {
         child: GestureDetector(
           onLongPress: _isBlinking ? _stopBlinking : null,
           child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: const CircleBorder(),
-              padding: const EdgeInsets.all(60),
+            style: ButtonStyle(
+              // ignore: deprecated_member_use
+              backgroundColor: MaterialStateProperty.resolveWith<Color>(
+                (Set<WidgetState> states) {
+                  // Always return red, even when disabled
+                  return Colors.red;
+                },
+              ),
+              shape: WidgetStateProperty.all(const CircleBorder()),
+              padding: WidgetStateProperty.all(const EdgeInsets.all(60)),
             ),
             onPressed: _isBlinking ? null : _startBlinking,
             child: Column(
