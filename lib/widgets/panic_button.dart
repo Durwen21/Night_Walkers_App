@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:vibration/vibration.dart';
+import 'package:night_walkers_app/services/flashlight_service.dart';
 
 class PanicButton extends StatefulWidget {
   const PanicButton({super.key});
@@ -24,6 +25,9 @@ class _PanicButtonState extends State<PanicButton> {
       _isBlinking = true;
       _isRed = true;
     });
+
+    // Turn on flashlight when alarm starts
+    await FlashlightService.turnOn();
 
     
     _snackBarController = ScaffoldMessenger.of(context).showSnackBar(
@@ -49,12 +53,12 @@ class _PanicButtonState extends State<PanicButton> {
     );
 
     _blinkTimer?.cancel();
-    _blinkTimer = Timer.periodic(const Duration(milliseconds: 167), (timer) {
+    _blinkTimer = Timer.periodic(const Duration(milliseconds: 167), (timer) async {
       setState(() {
         _isRed = !_isRed;
-    
       });
-     
+      // Blink the flashlight in sync with the button
+      await FlashlightService.toggle(_isRed);
     });
 
     _vibrate();
@@ -67,6 +71,9 @@ class _PanicButtonState extends State<PanicButton> {
       _isRed = true;
       Vibration.cancel();
     });
+
+    // Ensure flashlight is off when stopping
+    FlashlightService.turnOff();
 
     _snackBarController?.close();
     _snackBarController = null;
