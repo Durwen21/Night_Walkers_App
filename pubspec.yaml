@@ -36,6 +36,7 @@ dependencies:
   audioplayers: ^5.2.1
   permission_handler: ^11.3.0
   shared_preferences: ^2.2.2
+  telephony: ^0.2.0
  
 
    

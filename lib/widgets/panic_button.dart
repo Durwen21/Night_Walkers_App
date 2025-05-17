@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:vibration/vibration.dart';
 import 'package:night_walkers_app/services/flashlight_service.dart';
 import 'package:night_walkers_app/services/sound_service.dart';
+import 'package:night_walkers_app/services/sms_service.dart';
 import 'package:geolocator/geolocator.dart';
 
 class PanicButton extends StatefulWidget {
@@ -69,7 +70,24 @@ class _PanicButtonState extends State<PanicButton> {
     final position = await _getCurrentLocation();
     if (position != null) {
       print('Latitude: ${position.latitude}, Longitude: ${position.longitude}');
-      // You can use this position to send SMS or save
+
+      // Send SMS with location to emergency contacts
+      try {
+        await SmsService.sendLocationSms(position.latitude, position.longitude);
+
+        // Show success notification, but don't dismiss the emergency snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Emergency SMS sent to contacts'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(bottom: 80, left: 20, right: 20),
+          ),
+        );
+      } catch (e) {
+        print('Failed to send SMS: $e');
+      }
     }
   }
 
