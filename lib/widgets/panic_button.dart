@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:vibration/vibration.dart';
 import 'package:night_walkers_app/services/flashlight_service.dart';
 import 'package:night_walkers_app/services/sound_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class PanicButton extends StatefulWidget {
   const PanicButton({super.key});
@@ -16,7 +17,8 @@ class _PanicButtonState extends State<PanicButton> {
   bool _isRed = true;
   Timer? _blinkTimer;
 
-  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _snackBarController;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?
+  _snackBarController;
 
   final Color neonRed = Colors.redAccent.shade100;
   final Color dimRed = Colors.redAccent.shade100.withAlpha(51);
@@ -27,9 +29,8 @@ class _PanicButtonState extends State<PanicButton> {
       _isRed = true;
     });
 
-    // Turn on flashlight when alarm starts
     await FlashlightService.turnOn();
-    SoundService.playAlarm(); // Start alarm sound
+    SoundService.playAlarm();
 
     _snackBarController = ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -46,23 +47,30 @@ class _PanicButtonState extends State<PanicButton> {
         backgroundColor: Colors.redAccent,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(16)),
         ),
-        duration: const Duration(days: 1), // para yawan sa HAAHHAHA
+        duration: const Duration(days: 1),
       ),
     );
 
     _blinkTimer?.cancel();
-    _blinkTimer = Timer.periodic(const Duration(milliseconds: 167), (timer) async {
+    _blinkTimer = Timer.periodic(const Duration(milliseconds: 167), (
+      timer,
+    ) async {
       setState(() {
         _isRed = !_isRed;
       });
-      // Blink the flashlight in sync with the button
       await FlashlightService.toggle(_isRed);
     });
 
     _vibrate();
+
+    final position = await _getCurrentLocation();
+    if (position != null) {
+      print('Latitude: ${position.latitude}, Longitude: ${position.longitude}');
+      // You can use this position to send SMS or save
+    }
   }
 
   void _stopBlinking() {
@@ -73,9 +81,8 @@ class _PanicButtonState extends State<PanicButton> {
       Vibration.cancel();
     });
 
-    // Ensure flashlight is off when stopping
     FlashlightService.turnOff();
-    SoundService.stopAlarm(); // Stop alarm sound
+    SoundService.stopAlarm();
 
     _snackBarController?.close();
     _snackBarController = null;
@@ -85,6 +92,40 @@ class _PanicButtonState extends State<PanicButton> {
     if (await Vibration.hasVibrator()) {
       Vibration.vibrate(pattern: [0, 500, 500, 500, 500, 500], repeat: 0);
     }
+  }
+
+  Future<Position?> _getCurrentLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Location services are disabled.')),
+      );
+      return null;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permission denied.')),
+        );
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location permission permanently denied.'),
+        ),
+      );
+      return null;
+    }
+
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
   }
 
   @override
@@ -97,47 +138,44 @@ class _PanicButtonState extends State<PanicButton> {
   @override
   Widget build(BuildContext context) {
     final Color activeNeon = Colors.redAccent.shade100;
-    final Color currentColor = _isBlinking
-        ? (_isRed ? activeNeon : const Color.fromARGB(255, 255, 0, 0))
-        : Colors.white;
+    final Color currentColor =
+        _isBlinking
+            ? (_isRed ? activeNeon : const Color.fromARGB(255, 255, 0, 0))
+            : Colors.white;
 
-    final List<Shadow> glow = _isBlinking && _isRed
-        ? [
-            Shadow(
-              color: const Color.fromARGB(255, 215, 25, 25),
-              blurRadius: 30,
-            )
-          ]
-        : [];
+    final List<Shadow> glow =
+        _isBlinking && _isRed
+            ? [
+              const Shadow(
+                color: Color.fromARGB(255, 215, 25, 25),
+                blurRadius: 30,
+              ),
+            ]
+            : [];
 
     return Center(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          boxShadow: _isBlinking && _isRed
-              ? [
-                  BoxShadow(
-                    color: Colors.redAccent.withValues(alpha: 153),
-                    blurRadius: 40,
-                    spreadRadius: 10,
-                  )
-                ]
-              : [],
+          boxShadow:
+              _isBlinking && _isRed
+                  ? [
+                    BoxShadow(
+                      color: Colors.redAccent.withAlpha(153),
+                      blurRadius: 40,
+                      spreadRadius: 10,
+                    ),
+                  ]
+                  : [],
         ),
         child: GestureDetector(
           onLongPress: _isBlinking ? _stopBlinking : null,
           child: ElevatedButton(
             style: ButtonStyle(
-              // ignore: deprecated_member_use
-              backgroundColor: MaterialStateProperty.resolveWith<Color>(
-                (Set<WidgetState> states) {
-                  // Always return red, even when disabled
-                  return Colors.red;
-                },
-              ),
-              shape: WidgetStateProperty.all(const CircleBorder()),
-              padding: WidgetStateProperty.all(const EdgeInsets.all(60)),
+              backgroundColor: MaterialStateProperty.all(Colors.red),
+              shape: MaterialStateProperty.all(const CircleBorder()),
+              padding: MaterialStateProperty.all(const EdgeInsets.all(60)),
             ),
             onPressed: _isBlinking ? null : _startBlinking,
             child: Column(
@@ -148,7 +186,8 @@ class _PanicButtonState extends State<PanicButton> {
                   child: Icon(
                     Icons.warning,
                     key: ValueKey<String>(
-                        '${_isBlinking}_${_isRed.toString()}'),
+                      '${_isBlinking}_${_isRed.toString()}',
+                    ),
                     color: currentColor,
                     size: 90,
                     shadows: glow,
