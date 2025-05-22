@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by NotificationManagerCompat.notify: android.permission.POST_NOTIFICATIONS"
+        severity="ignore"
+        file="C:/Users/johnd/AppData/Local/Pub/Cache/hosted/pub.dev/geolocator_android-4.6.2/android/src/main/java/com/baseflow/geolocator/location/BackgroundNotification.java"
+        line="100"/>
+</lint>

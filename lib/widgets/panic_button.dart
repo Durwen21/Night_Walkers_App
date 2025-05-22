@@ -5,6 +5,9 @@ import 'package:night_walkers_app/services/flashlight_service.dart';
 import 'package:night_walkers_app/services/sound_service.dart';
 import 'package:night_walkers_app/services/sms_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:telephony/telephony.dart';
+import 'dart:convert';
 
 class PanicButton extends StatefulWidget {
   const PanicButton({super.key});
@@ -23,6 +26,8 @@ class _PanicButtonState extends State<PanicButton> {
 
   final Color neonRed = Colors.redAccent.shade100;
   final Color dimRed = Colors.redAccent.shade100.withAlpha(51);
+
+  final Telephony telephony = Telephony.instance;
 
   void _startBlinking() async {
     setState(() {
@@ -74,6 +79,10 @@ class _PanicButtonState extends State<PanicButton> {
       // Send SMS with location to emergency contacts
       try {
         await SmsService.sendLocationSms(position.latitude, position.longitude);
+        // Also send a generic emergency SMS to all contacts
+        await _sendEmergencySmsToAllContacts(
+          'This is an emergency! Please help me immediately! My location: https://maps.google.com/?q=${position.latitude},${position.longitude}',
+        );
 
         // Show success notification, but don't dismiss the emergency snackbar
         ScaffoldMessenger.of(context).showSnackBar(
@@ -146,6 +155,41 @@ class _PanicButtonState extends State<PanicButton> {
     );
   }
 
+  Future<void> _sendEmergencySmsToAllContacts(String message) async {
+    final prefs = await SharedPreferences.getInstance();
+    final contactsJson = prefs.getString('emergency_contacts');
+    if (contactsJson == null) return;
+    final contacts = (jsonDecode(contactsJson) as List)
+        .map((item) => {
+              'name': item['name'].toString(),
+              'number': item['number'].toString(),
+            })
+        .toList();
+    final bool? permissionsGranted = await telephony.requestSmsPermissions;
+    if (permissionsGranted == true) {
+      for (var contact in contacts) {
+        final number = contact['number'];
+        if (number != null) {
+          await telephony.sendSms(
+            to: number,
+            message: message,
+          );
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Emergency SMS sent to all contacts")),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("SMS permission denied")),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _blinkTimer?.cancel();
@@ -191,9 +235,9 @@ class _PanicButtonState extends State<PanicButton> {
           onLongPress: _isBlinking ? _stopBlinking : null,
           child: ElevatedButton(
             style: ButtonStyle(
-              backgroundColor: MaterialStateProperty.all(Colors.red),
-              shape: MaterialStateProperty.all(const CircleBorder()),
-              padding: MaterialStateProperty.all(const EdgeInsets.all(60)),
+              backgroundColor: WidgetStateProperty.all(Colors.red),
+              shape: WidgetStateProperty.all(const CircleBorder()),
+              padding: WidgetStateProperty.all(const EdgeInsets.all(60)),
             ),
             onPressed: _isBlinking ? null : _startBlinking,
             child: Column(
