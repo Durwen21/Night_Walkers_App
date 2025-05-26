@@ -8,9 +8,11 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telephony/telephony.dart';
 import 'dart:convert';
+import 'package:volume_controller/volume_controller.dart';
+import 'package:night_walkers_app/widgets/panic_countdown_overlay.dart';
 
 class PanicButton extends StatefulWidget {
-  final bool soundEnabled;
+  final bool soundEnabled;    
   final bool vibrationEnabled;
   final bool flashlightEnabled;
   final double flashlightBlinkSpeed;
@@ -21,6 +23,8 @@ class PanicButton extends StatefulWidget {
   final bool confirmBeforeActivation;
   final bool sendLocationAsPlainText;
   final bool batterySaverEnabled;
+  final bool alwaysMaxVolume;
+  final double alarmVolume;
 
   const PanicButton({
     super.key,
@@ -35,6 +39,8 @@ class PanicButton extends StatefulWidget {
     required this.confirmBeforeActivation,
     required this.sendLocationAsPlainText,
     required this.batterySaverEnabled,
+    required this.alwaysMaxVolume,
+    required this.alarmVolume,
   });
 
   @override
@@ -45,6 +51,9 @@ class _PanicButtonState extends State<PanicButton> {
   bool _isBlinking = false;
   bool _isRed = true;
   Timer? _blinkTimer;
+  Timer? _cancelTimer;
+  final bool _showCancelInstruction = false;
+  double _initialVolume = 0.0;
 
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?
   _snackBarController;
@@ -55,103 +64,118 @@ class _PanicButtonState extends State<PanicButton> {
   final Telephony telephony = Telephony.instance;
 
   void _startBlinking() async {
-    // Confirmation dialog logic
+    bool confirmed = true; // Assume confirmed by default 
+
     if (!widget.quickActivation && widget.confirmBeforeActivation) {
-      final confirmed = await showDialog<bool>(
+      // Show SA USEER PanicCountdownOverlay
+      final result = await showDialog<bool>( // Get the result directly
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Activate Panic Mode?'),
-          content: const Text('Are you sure you want to activate panic mode?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Activate'),
-            ),
-          ],
+        barrierDismissible: false, // MUNI GA Prevent dismissing by tapping outsiE
+        builder: (context) => PanicCountdownOverlay(
+          onCountdownComplete: () {
+            // The overlay will pop itself with true on completion
+            Navigator.of(context).pop(true); // Add pop back for completion
+          },
+          onCancel: () {
+            // Call _stopBlinking BEFORE popping the dialog
+            _stopBlinking(); 
+            Navigator.of(context).pop(false); // Pop with false on cancellation
+          },
         ),
       );
-      if (confirmed != true) return;
-    }
 
-    setState(() {
-      _isBlinking = true;
-      _isRed = true;
-    });
+      confirmed = result ?? false; // Assign the result to confirmed, handle null case
 
-    if (widget.flashlightEnabled) {
-      await FlashlightService.turnOn();
-    }
-    if (widget.soundEnabled) {
-      SoundService.playAlarm(widget.selectedRingtone);
-    }
-
-    _snackBarController = ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Long press the button to stop the alarm!',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 1.2,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        backgroundColor: Colors.redAccent,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-        ),
-        duration: const Duration(seconds: 5),
-      ),
-    );
-
-    _blinkTimer?.cancel();
-    if (widget.flashlightEnabled) {
-      final int blinkSpeed = widget.batterySaverEnabled ? 500 : widget.flashlightBlinkSpeed.round();
-      _blinkTimer = Timer.periodic(
-        Duration(milliseconds: blinkSpeed),
-        (timer) async {
-          setState(() {
-            _isRed = !_isRed;
-          });
-          await FlashlightService.toggle(_isRed);
-        },
-      );
-    }
-
-    if (widget.vibrationEnabled) {
-      _vibrate();
-    }
-
-    Position? position;
-    if (widget.autoLocationShare) {
-      position = await _getCurrentLocation();
-    }
-    String message = widget.customMessage;
-    if (position != null) {
-      if (widget.sendLocationAsPlainText) {
-        message +=
-            ' My location coordinates are: Latitude ${position.latitude}, Longitude ${position.longitude}';
-      } else {
-        message +=
-            ' My location is: https://maps.google.com/?q=${position.latitude},${position.longitude}';
+      // If confirmed is false (cancelled), the stopping is handled by the onCancel callback.
+      // We just need to prevent the activation logic below from running.
+      if (confirmed == false) {
+        return; 
       }
+       // If confirmed is true, proceed with the activation logic below.
     }
-    if (widget.autoLocationShare) {
-      try {
-        await _sendEmergencySmsToAllContacts(message);
-      } catch (e) {
-        print('Failed to send SMS: $e');
+
+    // Proceed with activation only if confirmed is true (or if no confirmation was needed)
+    if (confirmed == true) {
+      setState(() {
+        _isBlinking = true; 
+        _isRed = true;
+      });
+
+      if (widget.flashlightEnabled) {
+        await FlashlightService.turnOn();
+      }
+      if (widget.soundEnabled) {
+        _initialVolume = await VolumeController.instance.getVolume();
+        final double targetVolume = widget.alwaysMaxVolume ? 1.0 : widget.alarmVolume;
+        await VolumeController.instance.setVolume(targetVolume);
+        SoundService.playAlarm(filename: widget.selectedRingtone, volume: 1.0);
+      }
+
+      _snackBarController = ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Long press the button to stop the alarm!',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 1.2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          backgroundColor: Colors.redAccent,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+
+      _blinkTimer?.cancel();
+      if (widget.flashlightEnabled) {
+        final int blinkSpeed = widget.batterySaverEnabled ? 500 : widget.flashlightBlinkSpeed.round();
+        _blinkTimer = Timer.periodic(
+          Duration(milliseconds: blinkSpeed),
+          (timer) async {
+            setState(() {
+              _isRed = !_isRed;
+            });
+            await FlashlightService.toggle(_isRed);
+          },
+        );
+      }
+
+      if (widget.vibrationEnabled) {
+        _vibrate();
+      }
+
+      Position? position;
+      if (widget.autoLocationShare) {
+        position = await _getCurrentLocation();
+      }
+      String message = widget.customMessage;
+      if (position != null) {
+        if (widget.sendLocationAsPlainText) {
+          message +=
+              ' My location coordinates are: Latitude ${position.latitude}, Longitude ${position.longitude}';
+        } else {
+          message +=
+              ' My location is: https://maps.google.com/?q=${position.latitude},${position.longitude}';
+        }
+      }
+      if (widget.autoLocationShare) {
+        try {
+          await _sendEmergencySmsToAllContacts(message);
+        } catch (e) {
+          print('Failed to send SMS: $e');
+        }
       }
     }
   }
 
   void _stopBlinking() {
     _blinkTimer?.cancel();
+    _cancelTimer?.cancel();
     setState(() {
       _isBlinking = false;
       _isRed = true;
@@ -160,6 +184,8 @@ class _PanicButtonState extends State<PanicButton> {
 
     FlashlightService.turnOff();
     SoundService.stopAlarm();
+
+    VolumeController.instance.setVolume(_initialVolume);
 
     if (mounted) {
       try {
@@ -263,7 +289,6 @@ class _PanicButtonState extends State<PanicButton> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine colors and effects based on Battery Saver mode
     final Color baseColor = widget.batterySaverEnabled ? Colors.grey.shade900 : Colors.redAccent.shade100;
     final Color activeColor = widget.batterySaverEnabled ? Colors.grey.shade700 : const Color.fromARGB(255, 255, 0, 0);
     final Color inactiveColor = widget.batterySaverEnabled ? Colors.grey.shade800 : Colors.white;
@@ -274,7 +299,7 @@ class _PanicButtonState extends State<PanicButton> {
             : inactiveColor;
 
     final List<Shadow> glow = (widget.batterySaverEnabled || !_isBlinking || !_isRed)
-        ? [] // No glow in battery saver mode or when not blinking/red
+        ? []
         : [
             const Shadow(
               color: Color.fromARGB(255, 215, 25, 25),
@@ -296,7 +321,7 @@ class _PanicButtonState extends State<PanicButton> {
             end: Alignment.bottomRight,
           ),
           boxShadow: [
-            if (!widget.batterySaverEnabled) // No main shadow in battery saver
+            if (!widget.batterySaverEnabled)
               BoxShadow(
                 color: Colors.redAccent.withOpacity(0.5),
                 blurRadius: 40,

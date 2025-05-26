@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class UserLocationMarker extends StatelessWidget {
   final double heading;
 
-  const UserLocationMarker({Key? key, required this.heading}) : super(key: key);
+  const UserLocationMarker({super.key, required this.heading});
 
   @override
   Widget build(BuildContext context) {

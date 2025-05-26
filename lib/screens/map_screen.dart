@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -8,6 +7,7 @@ import 'package:flutter_compass/flutter_compass.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:night_walkers_app/widgets/user_location_marker.dart';
 import 'package:night_walkers_app/widgets/fixed_compass.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 void main() {
   runApp(const MaterialApp(home: MapScreen()));
@@ -26,6 +26,7 @@ class _MapScreenState extends State<MapScreen> {
   double? _heading;
   StreamSubscription<CompassEvent>? _compassSubscription;
   List<LatLng> _fieldOfVisionPolygon = [];
+  bool _isConnected = true;
 
   final Map<String, String> _mapStyles = {
     'Street View': 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -36,6 +37,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _checkConnectivity();
     _getCurrentLocation();
     _requestPermissions();
   }
@@ -44,6 +46,13 @@ class _MapScreenState extends State<MapScreen> {
   void dispose() {
     _compassSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkConnectivity() async {
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    setState(() {
+      _isConnected = connectivityResult != ConnectivityResult.none;
+    });
   }
 
   Future<void> _requestPermissions() async {
@@ -85,9 +94,9 @@ class _MapScreenState extends State<MapScreen> {
   void _updateFieldOfVisionPolygon() {
     if (_currentPosition == null || _heading == null) return;
 
-    const double distance =300; // Distance in meters for the field of vision (increased)
+    const double distance =350; // Distance in meters for the field of vision (increased)
     const double fovAngle = 60; // Field of vision angle in degrees
-    const int segments = 20; // Number of segments for the arc
+    const int segments = 20; // Number of segments for the arcs
 
     List<LatLng> points = [_currentPosition!];
 
@@ -114,9 +123,17 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body:
-          _currentPosition == null
-              ? const Center(child: CircularProgressIndicator())
-              : Stack(
+          !_isConnected
+              ? const Center(
+                  child: Text(
+                    'No internet connection. Map cannot be loaded.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 18, color: Colors.red),
+                  ),
+                )
+              : _currentPosition == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : Stack(
                 children: [
                   FlutterMap(
                     options: MapOptions(center: _currentPosition, zoom: 16, rotation: -(_heading ?? 0)),

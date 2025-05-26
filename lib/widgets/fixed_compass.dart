@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class FixedCompass extends StatelessWidget {
   final double heading; // in degrees
 
-  const FixedCompass({Key? key, required this.heading}) : super(key: key);
+  const FixedCompass({super.key, required this.heading});
 
   @override
   Widget build(BuildContext context) {

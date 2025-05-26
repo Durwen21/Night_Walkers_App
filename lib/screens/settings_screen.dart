@@ -22,6 +22,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _confirmBeforeActivation = true;
   bool _sendLocationAsPlainText = true;
   bool _batterySaverEnabled = false;
+  bool _alwaysMaxVolume = false; // Add new setting variable for max volume toggle
+  double _alarmVolume = 1.0; // Add new setting variable for custom volume
 
   final TextEditingController _messageController = TextEditingController();
 
@@ -64,6 +66,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _messageController.text = _customMessage;
       _sendLocationAsPlainText = prefs.getBool('send_location_as_plain_text') ?? true;
       _batterySaverEnabled = prefs.getBool('battery_saver_enabled') ?? false;
+      _alwaysMaxVolume = prefs.getBool('always_max_volume') ?? false; // Load the new setting
+      _alarmVolume = prefs.getDouble('alarm_volume') ?? 1.0; // Load the new setting
     });
   }
 
@@ -219,6 +223,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                   );
                 },
+              ),
+            ]),
+
+            // Alarm Volume Controls
+            _buildSection('Alarm Volume', [
+              SwitchListTile(
+                title: const Text('Always Max Volume'),
+                subtitle: const Text('Play alarm at maximum volume'),
+                value: _alwaysMaxVolume,
+                onChanged: (value) {
+                  setState(() => _alwaysMaxVolume = value);
+                  _saveSetting('always_max_volume', value);
+                },
+              ),
+              ListTile(
+                title: const Text('Custom Alarm Volume'),
+                subtitle: Slider(
+                  value: _alarmVolume,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 10, // 0.0 to 1.0 in 0.1 increments
+                  label: '${(_alarmVolume * 100).round()}%',
+                  onChanged: _alwaysMaxVolume ? null : (value) {
+                    setState(() => _alarmVolume = value);
+                    _saveSetting('alarm_volume', value);
+                  },
+                ),
+                // Disable the ListTile if Always Max Volume is on
+                enabled: !_alwaysMaxVolume,
               ),
             ]),
 

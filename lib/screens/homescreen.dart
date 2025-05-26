@@ -30,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _flashlightOn = false;
   bool _sendLocationAsPlainText = false;
   bool _batterySaverEnabled = false;
+  bool _alwaysMaxVolume = false;
+  double _alarmVolume = 1.0;
 
   @override
   void initState() {
@@ -51,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _confirmBeforeActivation = prefs.getBool('confirm_before_activation') ?? true;
       _sendLocationAsPlainText = prefs.getBool('send_location_as_plain_text') ?? false;
       _batterySaverEnabled = prefs.getBool('battery_saver_enabled') ?? false;
+      _alwaysMaxVolume = prefs.getBool('always_max_volume') ?? false;
+      _alarmVolume = prefs.getDouble('alarm_volume') ?? 1.0;
     });
   }
 
@@ -58,32 +62,43 @@ class _HomeScreenState extends State<HomeScreen> {
     Column(
       children: [
         if (_batterySaverEnabled) // Show text when battery saver is enabled
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0),
+          Container(
+            width: double.infinity,
+            color: Theme.of(context).colorScheme.error.withOpacity(0.2), // Subtle background color
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0), // Added horizontal padding
             child: Text(
               'Battery Saver Mode Active',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.error, // Use error color for emphasis
+                color: Theme.of(context).colorScheme.error,
               ),
+              textAlign: TextAlign.center, 
             ),
           ),
-        StatusDashboard(),
+        Padding(
+          padding: const EdgeInsets.all(16.0), 
+          child: StatusDashboard(),
+        ),
         Expanded(
           child: Center(
-            child: PanicButton(
-              soundEnabled: _soundEnabled,
-              vibrationEnabled: _vibrationEnabled,
-              flashlightEnabled: _flashlightEnabled,
-              flashlightBlinkSpeed: _flashlightBlinkSpeed,
-              selectedRingtone: _selectedRingtone,
-              autoLocationShare: _autoLocationShare,
-              customMessage: _customMessage,
-              quickActivation: _quickActivation,
-              confirmBeforeActivation: _confirmBeforeActivation,
-              sendLocationAsPlainText: _sendLocationAsPlainText,
-              batterySaverEnabled: _batterySaverEnabled,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0), // Added padding here around the panic button
+              child: PanicButton(
+                soundEnabled: _soundEnabled,
+                vibrationEnabled: _vibrationEnabled,
+                flashlightEnabled: _flashlightEnabled,
+                flashlightBlinkSpeed: _flashlightBlinkSpeed,
+                selectedRingtone: _selectedRingtone,
+                autoLocationShare: _autoLocationShare,
+                customMessage: _customMessage,
+                quickActivation: _quickActivation,
+                confirmBeforeActivation: _confirmBeforeActivation,
+                sendLocationAsPlainText: _sendLocationAsPlainText,
+                batterySaverEnabled: _batterySaverEnabled,
+                alwaysMaxVolume: _alwaysMaxVolume,
+                alarmVolume: _alarmVolume,
+              ),
             ),
           ),
         ),
@@ -126,14 +141,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     const Color unselectedColor = Colors.black;
-    const Color selectedColor = Color(0xFFB39DDB); // Light purple
+    const Color selectedColor = Color(0xFFB39DDB); // Light purple color
 
     return Scaffold(
       appBar: AppBar(
         title: _selectedIndex == 0 ? const Text('Night Walkers App') : null,
         actions: [
           // Battery Saver Toggle Button
-          if (_selectedIndex == 0) // Only show on the home screen
+          if (_selectedIndex == 0) // Only show on the home screen here
             IconButton(
               icon: Icon(
                 _batterySaverEnabled ? Icons.battery_saver : Icons.battery_alert_outlined,

@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Global error widget for user-friendly error messages
+  // Global error widget 
   ErrorWidget.builder = (FlutterErrorDetails details) {
     bool inDebug = false;
     assert(() {
