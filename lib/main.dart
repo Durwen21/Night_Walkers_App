@@ -52,22 +52,22 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      // Named routes for easier navigation
+      // Named routes para kuno easier navigation
       routes: {
         '/': (context) => Semantics(
               label: 'Night Walkers Home Screen',
               child: const HomeScreen(),
             ),
         '/onboarding': (context) => const OnboardingScreen(),
-        // Add more routes here as your app grows
+       
        
       },
       initialRoute: showOnboarding ? '/onboarding' : '/',
-      // Responsive design: wrap home in LayoutBuilder for demonstration
+      // Responsive design gyat: wrap home in LayoutBuilder to adjust layout based on screen size
       builder: (context, child) {
         return LayoutBuilder(
           builder: (context, constraints) {
-            // Example: adjust text scale for small screens
+            
             final scale = constraints.maxWidth < 400 ? 0.9 : 1.0;
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),

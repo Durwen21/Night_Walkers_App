@@ -3,14 +3,35 @@ import 'dart:async';
 import 'package:vibration/vibration.dart';
 import 'package:night_walkers_app/services/flashlight_service.dart';
 import 'package:night_walkers_app/services/sound_service.dart';
-import 'package:night_walkers_app/services/sms_service.dart';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telephony/telephony.dart';
 import 'dart:convert';
 
 class PanicButton extends StatefulWidget {
-  const PanicButton({super.key});
+  final bool soundEnabled;
+  final bool vibrationEnabled;
+  final bool flashlightEnabled;
+  final double flashlightBlinkSpeed;
+  final String selectedRingtone;
+  final bool autoLocationShare;
+  final String customMessage;
+  final bool quickActivation;
+  final bool confirmBeforeActivation;
+
+  const PanicButton({
+    super.key,
+    required this.soundEnabled,
+    required this.vibrationEnabled,
+    required this.flashlightEnabled,
+    required this.flashlightBlinkSpeed,
+    required this.selectedRingtone,
+    required this.autoLocationShare,
+    required this.customMessage,
+    required this.quickActivation,
+    required this.confirmBeforeActivation,
+  });
 
   @override
   State<PanicButton> createState() => _PanicButtonState();
@@ -30,13 +51,39 @@ class _PanicButtonState extends State<PanicButton> {
   final Telephony telephony = Telephony.instance;
 
   void _startBlinking() async {
+    // Confirmation dialog logic
+    if (!widget.quickActivation && widget.confirmBeforeActivation) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Activate Panic Mode?'),
+          content: const Text('Are you sure you want to activate panic mode?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Activate'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
     setState(() {
       _isBlinking = true;
       _isRed = true;
     });
 
-    await FlashlightService.turnOn();
-    SoundService.playAlarm();
+    if (widget.flashlightEnabled) {
+      await FlashlightService.turnOn();
+    }
+    if (widget.soundEnabled) {
+      SoundService.playAlarm(widget.selectedRingtone);
+    }
 
     _snackBarController = ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -61,39 +108,34 @@ class _PanicButtonState extends State<PanicButton> {
     );
 
     _blinkTimer?.cancel();
-    _blinkTimer = Timer.periodic(const Duration(milliseconds: 167), (
-      timer,
-    ) async {
-      setState(() {
-        _isRed = !_isRed;
-      });
-      await FlashlightService.toggle(_isRed);
-    });
+    if (widget.flashlightEnabled) {
+      _blinkTimer = Timer.periodic(
+        Duration(milliseconds: widget.flashlightBlinkSpeed.round()),
+        (timer) async {
+          setState(() {
+            _isRed = !_isRed;
+          });
+          await FlashlightService.toggle(_isRed);
+        },
+      );
+    }
 
-    _vibrate();
+    if (widget.vibrationEnabled) {
+      _vibrate();
+    }
 
-    final position = await _getCurrentLocation();
+    Position? position;
+    if (widget.autoLocationShare) {
+      position = await _getCurrentLocation();
+    }
+    String message = widget.customMessage;
     if (position != null) {
-      print('Latitude: ${position.latitude}, Longitude: ${position.longitude}');
-
-      // Send SMS with location to emergency contacts
+      message +=
+          ' My location: https://maps.google.com/?q=${position.latitude},${position.longitude}';
+    }
+    if (widget.autoLocationShare) {
       try {
-        await SmsService.sendLocationSms(position.latitude, position.longitude);
-        // Also send a generic emergency SMS to all contacts
-        await _sendEmergencySmsToAllContacts(
-          'This is an emergency! Please help me immediately! My location: https://maps.google.com/?q=${position.latitude},${position.longitude}',
-        );
-
-        // Show success notification, but don't dismiss the emergency snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Emergency SMS sent to contacts'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.only(bottom: 80, left: 20, right: 20),
-          ),
-        );
+        await _sendEmergencySmsToAllContacts(message);
       } catch (e) {
         print('Failed to send SMS: $e');
       }
@@ -111,7 +153,13 @@ class _PanicButtonState extends State<PanicButton> {
     FlashlightService.turnOff();
     SoundService.stopAlarm();
 
-    _snackBarController?.close();
+    if (mounted) {
+      try {
+        _snackBarController?.close();
+      } catch (_) {
+        // Ignore errors if already closed or context is gone
+      }
+    }
     _snackBarController = null;
   }
 
@@ -193,7 +241,13 @@ class _PanicButtonState extends State<PanicButton> {
   @override
   void dispose() {
     _blinkTimer?.cancel();
-    _snackBarController?.close();
+    if (mounted) {
+      try {
+        _snackBarController?.close();
+      } catch (_) {
+        // Ignore errors if already closed or context is gone
+      }
+    }
     super.dispose();
   }
 
@@ -220,53 +274,74 @@ class _PanicButtonState extends State<PanicButton> {
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          boxShadow:
-              _isBlinking && _isRed
-                  ? [
-                    BoxShadow(
-                      color: Colors.redAccent.withAlpha(153),
-                      blurRadius: 40,
-                      spreadRadius: 10,
-                    ),
-                  ]
-                  : [],
+          gradient: LinearGradient(
+            colors: [
+              Colors.redAccent.shade100,
+              Colors.red.shade700,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.redAccent.withOpacity(0.5),
+              blurRadius: 40,
+              spreadRadius: 10,
+              offset: const Offset(0, 12),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              spreadRadius: 1,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(
+            color: Colors.white.withOpacity(0.7),
+            width: 4,
+          ),
         ),
         child: GestureDetector(
           onLongPress: _isBlinking ? _stopBlinking : null,
-          child: ElevatedButton(
-            style: ButtonStyle(
-              backgroundColor: WidgetStateProperty.all(Colors.red),
-              shape: WidgetStateProperty.all(const CircleBorder()),
-              padding: WidgetStateProperty.all(const EdgeInsets.all(60)),
-            ),
-            onPressed: _isBlinking ? null : _startBlinking,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 150),
-                  child: Icon(
-                    Icons.warning,
-                    key: ValueKey<String>(
-                      '${_isBlinking}_${_isRed.toString()}',
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            elevation: 12,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              splashColor: Colors.white24,
+              onTap: _isBlinking ? null : _startBlinking,
+              child: Padding(
+                padding: const EdgeInsets.all(60),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 150),
+                      child: Icon(
+                        Icons.warning,
+                        key: ValueKey<String>(
+                          '${_isBlinking}_${_isRed.toString()}',
+                        ),
+                        color: currentColor,
+                        size: 90,
+                        shadows: glow,
+                      ),
                     ),
-                    color: currentColor,
-                    size: 90,
-                    shadows: glow,
-                  ),
+                    const SizedBox(height: 10),
+                    AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 150),
+                      style: TextStyle(
+                        color: currentColor,
+                        fontSize: 90,
+                        fontWeight: FontWeight.bold,
+                        shadows: glow,
+                      ),
+                      child: const Text('SOS'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 150),
-                  style: TextStyle(
-                    color: currentColor,
-                    fontSize: 90,
-                    fontWeight: FontWeight.bold,
-                    shadows: glow,
-                  ),
-                  child: const Text('SOS'),
-                ),
-              ],
+              ),
             ),
           ),
         ),
