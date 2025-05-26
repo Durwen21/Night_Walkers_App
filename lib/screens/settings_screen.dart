@@ -20,6 +20,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _customMessage = 'This is an emergency! Please help me immediately!';
   String _selectedRingtone = 'Default Alarm';
   bool _confirmBeforeActivation = true;
+  bool _sendLocationAsPlainText = true;
+  bool _batterySaverEnabled = false;
 
   final TextEditingController _messageController = TextEditingController();
 
@@ -60,6 +62,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _confirmBeforeActivation =
           prefs.getBool('confirm_before_activation') ?? true;
       _messageController.text = _customMessage;
+      _sendLocationAsPlainText = prefs.getBool('send_location_as_plain_text') ?? true;
+      _batterySaverEnabled = prefs.getBool('battery_saver_enabled') ?? false;
     });
   }
 
@@ -231,6 +235,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _saveSetting('auto_location_share', value);
                 },
               ),
+              SwitchListTile(
+                title: const Text('Send Location as Plain Text'),
+                subtitle: const Text(
+                  'Send latitude and longitude coordinates as text instead of a link (might help with sending issues)',
+                ),
+                value: _sendLocationAsPlainText,
+                onChanged: (value) {
+                  setState(() => _sendLocationAsPlainText = value);
+                  _saveSetting('send_location_as_plain_text', value);
+                },
+              ),
               ListTile(
                 title: const Text('Custom Emergency Message'),
                 subtitle: const Text(
@@ -273,6 +288,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ],
                         ),
                   );
+                },
+              ),
+            ]),
+
+            // Battery Saver Section
+            _buildSection('Battery Saver', [
+              SwitchListTile(
+                title: const Text('Enable Battery Saver Mode'),
+                subtitle: const Text(
+                  'Optimize features to conserve battery during emergencies',
+                ),
+                value: _batterySaverEnabled,
+                onChanged: (value) {
+                  setState(() => _batterySaverEnabled = value);
+                  _saveSetting('battery_saver_enabled', value);
                 },
               ),
             ]),

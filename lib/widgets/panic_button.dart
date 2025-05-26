@@ -19,6 +19,8 @@ class PanicButton extends StatefulWidget {
   final String customMessage;
   final bool quickActivation;
   final bool confirmBeforeActivation;
+  final bool sendLocationAsPlainText;
+  final bool batterySaverEnabled;
 
   const PanicButton({
     super.key,
@@ -31,6 +33,8 @@ class PanicButton extends StatefulWidget {
     required this.customMessage,
     required this.quickActivation,
     required this.confirmBeforeActivation,
+    required this.sendLocationAsPlainText,
+    required this.batterySaverEnabled,
   });
 
   @override
@@ -98,19 +102,18 @@ class _PanicButtonState extends State<PanicButton> {
           textAlign: TextAlign.center,
         ),
         backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(16)),
         ),
-        duration: const Duration(days: 1),
+        duration: const Duration(seconds: 5),
       ),
     );
 
     _blinkTimer?.cancel();
     if (widget.flashlightEnabled) {
+      final int blinkSpeed = widget.batterySaverEnabled ? 500 : widget.flashlightBlinkSpeed.round();
       _blinkTimer = Timer.periodic(
-        Duration(milliseconds: widget.flashlightBlinkSpeed.round()),
+        Duration(milliseconds: blinkSpeed),
         (timer) async {
           setState(() {
             _isRed = !_isRed;
@@ -130,8 +133,13 @@ class _PanicButtonState extends State<PanicButton> {
     }
     String message = widget.customMessage;
     if (position != null) {
-      message +=
-          ' My location: https://maps.google.com/?q=${position.latitude},${position.longitude}';
+      if (widget.sendLocationAsPlainText) {
+        message +=
+            ' My location coordinates are: Latitude ${position.latitude}, Longitude ${position.longitude}';
+      } else {
+        message +=
+            ' My location is: https://maps.google.com/?q=${position.latitude},${position.longitude}';
+      }
     }
     if (widget.autoLocationShare) {
       try {
@@ -218,10 +226,12 @@ class _PanicButtonState extends State<PanicButton> {
       for (var contact in contacts) {
         final number = contact['number'];
         if (number != null) {
-          await telephony.sendSms(
-            to: number,
-            message: message,
-          );
+          try {
+            await telephony.sendSms(to: number, message: message);
+            print('Emergency SMS sent to ${contact['name']} ($number)');
+          } catch (e) {
+            print('Error sending SMS via telephony.sendSms: $e');
+          }
         }
       }
       if (mounted) {
@@ -253,21 +263,24 @@ class _PanicButtonState extends State<PanicButton> {
 
   @override
   Widget build(BuildContext context) {
-    final Color activeNeon = Colors.redAccent.shade100;
+    // Determine colors and effects based on Battery Saver mode
+    final Color baseColor = widget.batterySaverEnabled ? Colors.grey.shade900 : Colors.redAccent.shade100;
+    final Color activeColor = widget.batterySaverEnabled ? Colors.grey.shade700 : const Color.fromARGB(255, 255, 0, 0);
+    final Color inactiveColor = widget.batterySaverEnabled ? Colors.grey.shade800 : Colors.white;
+
     final Color currentColor =
         _isBlinking
-            ? (_isRed ? activeNeon : const Color.fromARGB(255, 255, 0, 0))
-            : Colors.white;
+            ? (_isRed ? baseColor : activeColor)
+            : inactiveColor;
 
-    final List<Shadow> glow =
-        _isBlinking && _isRed
-            ? [
-              const Shadow(
-                color: Color.fromARGB(255, 215, 25, 25),
-                blurRadius: 30,
-              ),
-            ]
-            : [];
+    final List<Shadow> glow = (widget.batterySaverEnabled || !_isBlinking || !_isRed)
+        ? [] // No glow in battery saver mode or when not blinking/red
+        : [
+            const Shadow(
+              color: Color.fromARGB(255, 215, 25, 25),
+              blurRadius: 30,
+            ),
+          ];
 
     return Center(
       child: AnimatedContainer(
@@ -276,29 +289,30 @@ class _PanicButtonState extends State<PanicButton> {
           shape: BoxShape.circle,
           gradient: LinearGradient(
             colors: [
-              Colors.redAccent.shade100,
-              Colors.red.shade700,
+              widget.batterySaverEnabled ? Colors.grey.shade900 : Colors.redAccent.shade100,
+              widget.batterySaverEnabled ? Colors.grey.shade800 : Colors.red.shade700,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
+            if (!widget.batterySaverEnabled) // No main shadow in battery saver
+              BoxShadow(
+                color: Colors.redAccent.withOpacity(0.5),
+                blurRadius: 40,
+                spreadRadius: 10,
+                offset: const Offset(0, 12),
+              ),
             BoxShadow(
-              color: Colors.redAccent.withOpacity(0.5),
-              blurRadius: 40,
-              spreadRadius: 10,
-              offset: const Offset(0, 12),
-            ),
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              spreadRadius: 1,
-              offset: const Offset(0, 2),
+              color: widget.batterySaverEnabled ? Colors.black.withOpacity(0.5) : Colors.black.withOpacity(0.2),
+              blurRadius: widget.batterySaverEnabled ? 5 : 8,
+              spreadRadius: widget.batterySaverEnabled ? 0 : 1,
+              offset: widget.batterySaverEnabled ? const Offset(0, 4) : const Offset(0, 2),
             ),
           ],
           border: Border.all(
-            color: Colors.white.withOpacity(0.7),
-            width: 4,
+            color: widget.batterySaverEnabled ? Colors.grey.shade600 : Colors.white.withOpacity(0.7),
+            width: widget.batterySaverEnabled ? 2 : 4,
           ),
         ),
         child: GestureDetector(

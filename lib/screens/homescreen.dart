@@ -28,6 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedRingtone = 'Default Alarm';
   bool _confirmBeforeActivation = true;
   bool _flashlightOn = false;
+  bool _sendLocationAsPlainText = false;
+  bool _batterySaverEnabled = false;
 
   @override
   void initState() {
@@ -47,12 +49,26 @@ class _HomeScreenState extends State<HomeScreen> {
       _customMessage = prefs.getString('custom_message') ?? 'This is an emergency! Please help me immediately!';
       _selectedRingtone = prefs.getString('selected_ringtone') ?? 'Default Alarm';
       _confirmBeforeActivation = prefs.getBool('confirm_before_activation') ?? true;
+      _sendLocationAsPlainText = prefs.getBool('send_location_as_plain_text') ?? false;
+      _batterySaverEnabled = prefs.getBool('battery_saver_enabled') ?? false;
     });
   }
 
   List<Widget> get _screens => <Widget>[
     Column(
       children: [
+        if (_batterySaverEnabled) // Show text when battery saver is enabled
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              'Battery Saver Mode Active',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.error, // Use error color for emphasis
+              ),
+            ),
+          ),
         StatusDashboard(),
         Expanded(
           child: Center(
@@ -66,6 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
               customMessage: _customMessage,
               quickActivation: _quickActivation,
               confirmBeforeActivation: _confirmBeforeActivation,
+              sendLocationAsPlainText: _sendLocationAsPlainText,
+              batterySaverEnabled: _batterySaverEnabled,
             ),
           ),
         ),
@@ -97,6 +115,14 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _toggleBatterySaver() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _batterySaverEnabled = !_batterySaverEnabled;
+    });
+    await prefs.setBool('battery_saver_enabled', _batterySaverEnabled);
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color unselectedColor = Colors.black;
@@ -105,6 +131,40 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: _selectedIndex == 0 ? const Text('Night Walkers App') : null,
+        actions: [
+          // Battery Saver Toggle Button
+          if (_selectedIndex == 0) // Only show on the home screen
+            IconButton(
+              icon: Icon(
+                _batterySaverEnabled ? Icons.battery_saver : Icons.battery_alert_outlined,
+                color: _batterySaverEnabled ? Colors.greenAccent : Colors.amberAccent,
+              ),
+              tooltip: _batterySaverEnabled ? 'Battery Saver On' : 'Battery Saver Off',
+              onPressed: _toggleBatterySaver,
+            ),
+          if (_selectedIndex == 0) // Only show on the home screen
+            IconButton(
+              icon: const Icon(Icons.info_outline, color: Color.fromARGB(179, 0, 0, 0)), // Info icon
+              tooltip: 'About Battery Saver Mode',
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Battery Saver Mode'),
+                    content: const Text(
+                      'Enabling Battery Saver Mode optimizes features like flashlight blinking speed and UI to conserve battery during emergencies. Recommended when battery is low.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: _screens[_selectedIndex],
       floatingActionButton: _selectedIndex == 0

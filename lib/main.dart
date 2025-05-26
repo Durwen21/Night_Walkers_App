@@ -13,7 +13,7 @@ void main() async {
       return true;
     }());
     // In debug, show the default error
-    if (inDebug) {
+    if (inDebug) { 
       return ErrorWidget(details.exception);
     }
     // In release, show a friendly message
