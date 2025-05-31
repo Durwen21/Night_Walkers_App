@@ -65,7 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   else
                     const SizedBox(width: 64),
                   Row(
-                    children: List.generate(3, (index) => Container(
+                    children: List.generate(5, (index) => Container(
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       width: 10,
                       height: 10,

@@ -8,7 +8,7 @@ class UserLocationMarker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Transform.rotate(
-      angle: (heading * (3.14159 / 180)), // Convert degrees to radians
+      angle: (heading * (3.14159 / 180)), // Converts degrees to radians
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

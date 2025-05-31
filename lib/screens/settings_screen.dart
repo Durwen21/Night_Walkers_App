@@ -22,8 +22,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _confirmBeforeActivation = true;
   bool _sendLocationAsPlainText = true;
   bool _batterySaverEnabled = false;
-  bool _alwaysMaxVolume = false; // Add new setting variable for max volume toggle
-  double _alarmVolume = 1.0; // Add new setting variable for custom volume
+  bool _alwaysMaxVolume = false; 
+  double _alarmVolume = 1.0; 
+  bool _call911Enabled = false;
 
   final TextEditingController _messageController = TextEditingController();
 
@@ -66,8 +67,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _messageController.text = _customMessage;
       _sendLocationAsPlainText = prefs.getBool('send_location_as_plain_text') ?? true;
       _batterySaverEnabled = prefs.getBool('battery_saver_enabled') ?? false;
-      _alwaysMaxVolume = prefs.getBool('always_max_volume') ?? false; // Load the new setting
-      _alarmVolume = prefs.getDouble('alarm_volume') ?? 1.0; // Load the new setting
+      _alwaysMaxVolume = prefs.getBool('always_max_volume') ?? false;
+      _alarmVolume = prefs.getDouble('alarm_volume') ?? 1.0;
+      _call911Enabled = prefs.getBool('call_911_enabled') ?? false;
     });
   }
 
@@ -224,6 +226,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
+              SwitchListTile(
+                title: const Text('Automatic 911 Call'),
+                subtitle: const Text(
+                  'Automatically call 911 when panic button is activated',
+                ),
+                value: _call911Enabled,
+                onChanged: (value) {
+                  setState(() => _call911Enabled = value);
+                  _saveSetting('call_911_enabled', value);
+                },
+              ),
             ]),
 
             // Alarm Volume Controls
@@ -243,14 +256,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: _alarmVolume,
                   min: 0.0,
                   max: 1.0,
-                  divisions: 10, // 0.0 to 1.0 in 0.1 increments
+                  divisions: 10, 
                   label: '${(_alarmVolume * 100).round()}%',
                   onChanged: _alwaysMaxVolume ? null : (value) {
                     setState(() => _alarmVolume = value);
                     _saveSetting('alarm_volume', value);
                   },
                 ),
-                // Disable the ListTile if Always Max Volume is on
+                // Disables the ListTile if Always Max Volume is on
                 enabled: !_alwaysMaxVolume,
               ),
             ]),

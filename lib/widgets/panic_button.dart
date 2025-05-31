@@ -10,6 +10,7 @@ import 'package:telephony/telephony.dart';
 import 'dart:convert';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:night_walkers_app/widgets/panic_countdown_overlay.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PanicButton extends StatefulWidget {
   final bool soundEnabled;    
@@ -25,6 +26,7 @@ class PanicButton extends StatefulWidget {
   final bool batterySaverEnabled;
   final bool alwaysMaxVolume;
   final double alarmVolume;
+  final bool call911Enabled;
 
   const PanicButton({
     super.key,
@@ -41,6 +43,7 @@ class PanicButton extends StatefulWidget {
     required this.batterySaverEnabled,
     required this.alwaysMaxVolume,
     required this.alarmVolume,
+    required this.call911Enabled,
   });
 
   @override
@@ -54,6 +57,7 @@ class _PanicButtonState extends State<PanicButton> {
   Timer? _cancelTimer;
   final bool _showCancelInstruction = false;
   double _initialVolume = 0.0;
+  bool _call911Enabled = false;
 
   ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?
   _snackBarController;
@@ -63,8 +67,21 @@ class _PanicButtonState extends State<PanicButton> {
 
   final Telephony telephony = Telephony.instance;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  void _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _call911Enabled = prefs.getBool('call_911_enabled') ?? false;
+    });
+  }
+
   void _startBlinking() async {
-    bool confirmed = true; // Assume confirmed by default 
+    bool confirmed = true; // Assume confirmed by default ....
 
     if (!widget.quickActivation && widget.confirmBeforeActivation) {
       // Show SA USEER PanicCountdownOverlay
@@ -170,6 +187,10 @@ class _PanicButtonState extends State<PanicButton> {
           print('Failed to send SMS: $e');
         }
       }
+
+      if (_call911Enabled) {
+        _initiate911Call();
+      }
     }
   }
 
@@ -269,6 +290,21 @@ class _PanicButtonState extends State<PanicButton> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("SMS permission denied")),
+        );
+      }
+    }
+  }
+
+  Future<void> _initiate911Call() async {
+    const url = 'tel:911';
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url));
+    } else {
+      // Handle error: could not launch URL
+      print('Could not launch $url');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not initiate 911 call.')),
         );
       }
     }

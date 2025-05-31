@@ -32,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _batterySaverEnabled = false;
   bool _alwaysMaxVolume = false;
   double _alarmVolume = 1.0;
+  bool _call911Enabled = false;
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _batterySaverEnabled = prefs.getBool('battery_saver_enabled') ?? false;
       _alwaysMaxVolume = prefs.getBool('always_max_volume') ?? false;
       _alarmVolume = prefs.getDouble('alarm_volume') ?? 1.0;
+      _call911Enabled = prefs.getBool('call_911_enabled') ?? false;
     });
   }
 
@@ -98,6 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 batterySaverEnabled: _batterySaverEnabled,
                 alwaysMaxVolume: _alwaysMaxVolume,
                 alarmVolume: _alarmVolume,
+                call911Enabled: _call911Enabled,
               ),
             ),
           ),
@@ -184,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _screens[_selectedIndex],
       floatingActionButton: _selectedIndex == 0
           ? Padding(
-              padding: const EdgeInsets.only(bottom: 70.0), // just above the menu
+              padding: const EdgeInsets.only(bottom: 70.0), 
               child: FloatingActionButton(
                 onPressed: _toggleFlashlight,
                 backgroundColor: _flashlightOn ? Colors.yellow : Colors.grey[800],
